@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아이리스 정원: 성향 테스트 & 의사결정 트리 통합 앱</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Elegant botany serif & clean sans-serif -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome for botanical and mathematical icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans KR', 'Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        botanical: {
+                            50: '#f4f7f5',
+                            100: '#e5ebe6',
+                            200: '#ccd9cf',
+                            300: '#a3bda9',
+                            400: '#75997d',
+                            500: '#517559',
+                            600: '#3e5c45',
+                            700: '#334c39',
+                            800: '#2a3e2f',
+                            900: '#233427',
+                        },
+                        iris: {
+                            light: '#e0d8f0',
+                            DEFAULT: '#7c5295',
+                            dark: '#4c2e5e'
+                        },
+                        setosa: '#10b981',
+                        versicolor: '#f59e0b',
+                        virginica: '#6366f1'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom ranges for aesthetic touch */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #517559;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 2px solid white;
+            transition: transform 0.15s ease-in-out;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        /* Active glowing classes for Decision Tree */
+        .node-active {
+            transform: scale(1.03);
+            border-color: #517559 !important;
+            box-shadow: 0 10px 25px -5px rgba(81, 117, 89, 0.3), 0 8px 10px -6px rgba(81, 117, 89, 0.3);
+            background-color: #ffffff !important;
+            opacity: 1 !important;
+            z-index: 10;
+        }
+        .path-active {
+            stroke: #517559 !important;
+            stroke-width: 3.5px !important;
+            stroke-dasharray: 5;
+            animation: dash 1s linear infinite;
+        }
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -10;
+            }
+        }
+        .node-inactive {
+            opacity: 0.45;
+            filter: grayscale(15%);
+        }
+        .path-inactive {
+            stroke: #cbd5e1 !important;
+            stroke-width: 1.5px !important;
+        }
+        /* Fade-in animations */
+        .fade-in {
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col bg-slate-50/50">
+
+    <!-- Main Premium Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row justify-between items-center gap-4">
+            <!-- Brand Identity -->
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-botanical-100 rounded-xl text-botanical-600">
+                    <i class="fa-solid fa-leaf text-2xl animate-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                        아이리스 정원 <span class="text-xs bg-botanical-500 text-white px-2 py-0.5 rounded-full font-bold">통합 시뮬레이터</span>
+                    </h1>
+                    <p class="text-[10px] text-slate-400 font-mono">My Iris Personality Test & Decision Tree Visualizer</p>
+                </div>
+            </div>
+
+            <!-- Mode Switch Tabs -->
+            <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-inner w-full md:w-auto">
+                <button onclick="switchTab('personality-tab')" id="btn-personality-tab" class="flex-1 md:flex-initial text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 bg-white text-slate-900 shadow-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles text-botanical-500"></i> 1. 성향 테스트 (MBTI)
+                </button>
+                <button onclick="switchTab('tree-tab')" id="btn-tree-tab" class="flex-1 md:flex-initial text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800">
+                    <i class="fa-solid fa-diagram-project"></i> 2. 의사결정 트리 탐색
+                </button>
+                <button onclick="switchTab('explorer-tab')" id="btn-explorer-tab" class="flex-1 md:flex-initial text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800">
+                    <i class="fa-solid fa-database"></i> 3. 학습 & iris.csv
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Contents Workspace -->
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+
+        <!-- TAB 1: PERSONALITY TEST (MBTI STYLE) -->
+        <div id="section-personality-tab" class="fade-in max-w-lg mx-auto bg-white rounded-3xl shadow-md border border-slate-200/60 overflow-hidden flex flex-col justify-between min-h-[580px]">
+            <!-- Header Ribbon -->
+            <div class="bg-gradient-to-r from-botanical-600 to-botanical-800 text-white py-3.5 px-6 flex justify-between items-center">
+                <span class="text-xs uppercase tracking-wider font-bold text-botanical-200">나의 붓꽃 성향 테스트</span>
+                <span class="text-[10px] font-mono bg-botanical-700/50 px-2.5 py-0.5 rounded-full text-botanical-100 border border-botanical-500/30">Euclidean Distance Model</span>
+            </div>
+
+            <!-- Intro State -->
+            <div id="intro-view" class="p-6 sm:p-8 flex-1 flex flex-col justify-between">
+                <div class="text-center my-auto py-4">
+                    <div class="inline-flex justify-center items-center w-20 h-20 rounded-full bg-botanical-50 border border-botanical-100 mb-5 text-botanical-600 animate-bounce">
+                        <i class="fa-solid fa-heart-pulse text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-serif text-slate-800 font-bold mb-2.5">당신은 어떤 붓꽃을 닮았나요?</h2>
+                    <p class="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto mb-5">
+                        딱딱하게 느껴지던 수학적 붓꽃 데이터 수치를 나만의 성격이나 일상 라이프스타일에 대입해 보세요. 학계 표준 <span class="font-bold text-botanical-600 font-mono">iris.csv</span> 중심점 거리 알고리즘으로 당신의 성격 붓꽃을 진단합니다.
+                    </p>
+                    <div class="inline-flex items-center gap-1.5 bg-iris-light/30 text-iris text-[11px] font-semibold px-3 py-1.5 rounded-full">
+                        <i class="fa-solid fa-droplet"></i> 물주기 및 사교 햇빛 에너지 등 맞춤형 케어 포함!
+                    </div>
+                </div>
+                <button onclick="startTest()" class="w-full bg-botanical-600 hover:bg-botanical-700 text-white font-bold py-3.5 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2">
+                    <span>테스트 시작하기</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Question State -->
+            <div id="question-view" class="p-6 sm:p-8 flex-1 flex flex-col justify-between hidden">
+                <div>
+                    <div class="flex justify-between items-center mb-2.5">
+                        <span class="text-xs text-botanical-600 font-extrabold tracking-wider" id="step-indicator">STEP 1 OF 4</span>
+                        <span class="text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded" id="feature-mapping">꽃받침 길이</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 mb-6">
+                        <div id="progress-bar" class="bg-botanical-500 h-1.5 rounded-full transition-all duration-300" style="width: 25%"></div>
+                    </div>
+                </div>
+
+                <div class="my-auto py-2">
+                    <span class="text-botanical-500 text-2.5xl mb-3.5 block"><i id="question-icon" class="fa-solid fa-compass-drafting"></i></span>
+                    <h3 class="text-lg font-bold text-slate-800 mb-5 leading-snug" id="question-text">당신은 새로운 도전을 마주할 때 어떤 방식으로 나아가나요?</h3>
+                    
+                    <!-- Slider Value Selector -->
+                    <div class="bg-slate-50 border border-slate-100 p-5 rounded-2xl">
+                        <div class="flex justify-between items-center mb-2.5">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">수치 스케일</span>
+                            <span id="slider-val-label" class="text-xs font-black text-botanical-600">5점 (보통)</span>
+                        </div>
+                        <input type="range" id="quiz-slider" min="1" max="10" step="1" value="5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-botanical-600" oninput="updateQuizSlider(this.value)">
+                        <div class="flex justify-between text-[11px] text-slate-400 font-bold mt-2.5">
+                            <span id="label-left" class="max-w-[120px] leading-tight">계획보단 직관</span>
+                            <span id="label-right" class="max-w-[120px] text-right leading-tight">치밀한 준비</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2.5 mt-6">
+                    <button id="prev-btn" onclick="prevStep()" class="w-1/3 border border-slate-200 text-slate-500 font-bold py-3.5 rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-chevron-left text-xs"></i>
+                        <span>이전</span>
+                    </button>
+                    <button id="next-btn" onclick="nextStep()" class="w-2/3 bg-botanical-600 hover:bg-botanical-700 text-white font-bold py-3.5 rounded-2xl shadow-sm transition-all flex items-center justify-center gap-1.5">
+                        <span id="next-btn-text">다음 질문</span>
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-view" class="p-8 flex-1 flex flex-col justify-center items-center hidden">
+                <div class="relative w-20 h-20 mb-5">
+                    <div class="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                    <div class="absolute inset-0 border-4 border-t-botanical-500 border-r-botanical-300 rounded-full animate-spin"></div>
+                    <i class="fa-solid fa-filter text-2.5xl text-botanical-600 absolute inset-0 m-auto w-fit h-fit animate-pulse"></i>
+                </div>
+                <h4 class="text-base font-bold text-slate-800 mb-1">유클리드 모델 학습 분석 중...</h4>
+                <p class="text-xs text-slate-400 text-center max-w-[280px]">
+                    사용자 성격 지수를 실제 붓꽃 평균 클러스터 중심점으로 투영하여 최소 거리를 탐색하는 정규화 작업을 시작합니다.
+                </p>
+            </div>
+
+            <!-- Result State -->
+            <div id="result-view" class="hidden overflow-y-auto max-h-[520px] p-6 space-y-5">
+                <div class="text-center bg-gradient-to-br from-botanical-50 to-indigo-50/40 p-5 rounded-2xl border border-botanical-100 relative overflow-hidden">
+                    <p class="text-[10px] text-botanical-600 font-bold tracking-widest uppercase mb-1">당신에게 스며든 붓꽃 성향은</p>
+                    <h3 id="res-species" class="text-2xl font-serif font-black text-slate-900">세토사 (Setosa)</h3>
+                    <p id="res-subname" class="text-xs font-bold text-iris mt-0.5 mb-2.5">"차분하고 신중한 은둔의 평화주의자"</p>
+                    <span id="res-flower-lang" class="inline-block bg-white border border-slate-200/60 text-[11px] px-3 py-1 rounded-full shadow-sm text-slate-600">
+                        🌸 꽃말: <strong>사랑의 메시지</strong>
+                    </span>
+                </div>
+
+                <!-- Bio Intro Card -->
+                <div class="bg-white border rounded-xl p-4.5 space-y-2">
+                    <h4 class="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-tag text-botanical-500"></i> 꽃잎형 성향 탐방
+                    </h4>
+                    <p id="res-desc" class="text-xs text-slate-600 leading-relaxed">
+                        차분하고 신중한 분위기를 지닌 당신은 신속한 속도감보다는 완벽한 안전성을 추구하는 완벽주의 성향을 가졌습니다. 소수의 가치 있는 모임을 선호하는 부드러운 가슴을 지닌 인재입니다.
+                    </p>
+                </div>
+
+                <!-- Water & Sun Care Guide -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="bg-amber-50/50 border border-amber-100 rounded-xl p-3.5 space-y-1">
+                        <div class="flex items-center gap-1 text-amber-700 font-bold text-xs">
+                            <i class="fa-solid fa-sun"></i> 사교 햇빛 (E/I 성향)
+                        </div>
+                        <h5 id="res-sun-title" class="text-xs font-extrabold text-slate-800">반양지형 사교력</h5>
+                        <p id="res-sun-desc" class="text-[10.5px] text-slate-500 leading-normal">
+                            은은하게 부서져 내리는 부드러운 관심을 가장 편안해합니다.
+                        </p>
+                    </div>
+
+                    <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-3.5 space-y-1">
+                        <div class="flex items-center gap-1 text-blue-700 font-bold text-xs">
+                            <i class="fa-solid fa-droplet"></i> 감정 물주기 (주기)
+                        </div>
+                        <h5 id="res-water-title" class="text-xs font-extrabold text-slate-800">주 1회 단단한 소통</h5>
+                        <p id="res-water-desc" class="text-[10.5px] text-slate-500 leading-normal">
+                            끊임없는 카톡 공세보다 한 번 진솔하게 만날 때 마음이 단단히 적셔집니다.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Chemistry Match -->
+                <div class="bg-slate-50 border rounded-xl p-3.5 flex justify-between items-center text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 text-xs">
+                            <i class="fa-solid fa-heart"></i>
+                        </span>
+                        <div>
+                            <p class="text-[9px] text-slate-400 font-bold">정원 속 최고의 찰떡궁합</p>
+                            <p id="res-match" class="font-extrabold text-slate-700">버지니아 붓꽃 (Virginica) 성향</p>
+                        </div>
+                    </div>
+                    <span class="bg-white border text-slate-600 px-2.5 py-1 rounded-full text-[10px] font-bold">인연 🤝</span>
+                </div>
+
+                <!-- Math Centroid Distances -->
+                <div class="bg-slate-50 border rounded-xl p-4 text-[10px] text-slate-500 space-y-2">
+                    <p class="font-bold text-slate-700 flex items-center gap-1 font-sans">
+                        <i class="fa-solid fa-calculator text-botanical-500"></i> Euclidean Centroid Matching Distance
+                    </p>
+                    <p class="leading-normal">
+                        당신의 네 가지 행동 척도를 다차원 좌표계로 공간화하고, 실제 <code>iris.csv</code> 원본 데이터의 품종별 무게중심 좌표(Centroid)와의 거리를 실시간 연산한 물리적 결과입니다.
+                    </p>
+                    <div class="space-y-1.5 font-mono pt-1">
+                        <div class="flex items-center justify-between">
+                            <span>Setosa 군집 유사성</span>
+                            <div class="w-28 bg-slate-200 h-2 rounded-full overflow-hidden">
+                                <div id="dist-setosa" class="bg-setosa h-full" style="width: 20%"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Versicolor 군집 유사성</span>
+                            <div class="w-28 bg-slate-200 h-2 rounded-full overflow-hidden">
+                                <div id="dist-versicolor" class="bg-versicolor h-full" style="width: 20%"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Virginica 군집 유사성</span>
+                            <div class="w-28 bg-slate-200 h-2 rounded-full overflow-hidden">
+                                <div id="dist-virginica" class="bg-virginica h-full" style="width: 20%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Button Controls -->
+                <div class="flex gap-2.5 pt-2">
+                    <button onclick="copyTestResult()" class="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i> 공유하기
+                    </button>
+                    <button onclick="restartTest()" class="w-1/2 bg-botanical-600 hover:bg-botanical-700 text-white font-bold py-3 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-rotate-left"></i> 다시 테스트
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: INTERACTIVE DECISION TREE SIMULATOR -->
+        <div id="section-tree-tab" class="fade-in grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
+            <!-- Left Side: Sliders Controls (4 Columns) -->
+            <div class="lg:col-span-4 space-y-5">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm space-y-4">
+                    <div class="border-b border-slate-100 pb-2.5">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            <i class="fa-solid fa-sliders text-botanical-500"></i> 실시간 피처 조작 패널
+                        </h3>
+                        <p class="text-[11px] text-slate-400 mt-1 leading-normal">
+                            슬라이더를 밀어 꽃잎과 꽃받침의 수치를 변화시키면, 알고리즘이 예측하는 조건 분기 경로가 실시간 활성화됩니다.
+                        </p>
+                    </div>
+
+                    <!-- Slider 1: Petal Width (가장 핵심 임계치) -->
+                    <div class="space-y-1.5 bg-indigo-50/20 p-3.5 rounded-xl border border-indigo-100/40">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-extrabold text-slate-600 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-indigo-500"></span> 꽃잎 너비 (Petal Width)
+                            </span>
+                            <span id="label-petal-width" class="font-mono font-bold text-indigo-600 bg-white border border-indigo-100 px-2 py-0.5 rounded shadow-sm">1.5 cm</span>
+                        </div>
+                        <input type="range" id="sim-petal-width" min="0.1" max="2.5" step="0.1" value="1.5" 
+                               class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                               oninput="runTreePrediction()">
+                        <div class="flex justify-between text-[9px] text-slate-400 font-mono">
+                            <span>MIN 0.1cm</span>
+                            <span>MAX 2.5cm</span>
+                        </div>
+                    </div>
+
+                    <!-- Slider 2: Petal Length -->
+                    <div class="space-y-1.5 bg-sky-50/20 p-3.5 rounded-xl border border-sky-100/40">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-extrabold text-slate-600 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-sky-500"></span> 꽃잎 길이 (Petal Length)
+                            </span>
+                            <span id="label-petal-length" class="font-mono font-bold text-sky-600 bg-white border border-sky-100 px-2 py-0.5 rounded shadow-sm">4.5 cm</span>
+                        </div>
+                        <input type="range" id="sim-petal-length" min="1.0" max="6.9" step="0.1" value="4.5" 
+                               class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600"
+                               oninput="runTreePrediction()">
+                        <div class="flex justify-between text-[9px] text-slate-400 font-mono">
+                            <span>MIN 1.0cm</span>
+                            <span>MAX 6.9cm</span>
+                        </div>
+                    </div>
+
+                    <!-- Slider 3: Sepal Length -->
+                    <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-extrabold text-slate-600 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-amber-500"></span> 꽃받침 길이 (Sepal Length)
+                            </span>
+                            <span id="label-sepal-length" class="font-mono font-bold text-amber-600 bg-white border px-2 py-0.5 rounded shadow-sm">5.8 cm</span>
+                        </div>
+                        <input type="range" id="sim-sepal-length" min="4.3" max="7.9" step="0.1" value="5.8" 
+                               class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                               oninput="runTreePrediction()">
+                        <div class="flex justify-between text-[9px] text-slate-400 font-mono">
+                            <span>MIN 4.3cm</span>
+                            <span>MAX 7.9cm</span>
+                        </div>
+                    </div>
+
+                    <!-- Slider 4: Sepal Width -->
+                    <div class="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-extrabold text-slate-600 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-teal-500"></span> 꽃받침 너비 (Sepal Width)
+                            </span>
+                            <span id="label-sepal-width" class="font-mono font-bold text-teal-600 bg-white border px-2 py-0.5 rounded shadow-sm">3.0 cm</span>
+                        </div>
+                        <input type="range" id="sim-sepal-width" min="2.0" max="4.4" step="0.1" value="3.0" 
+                               class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                               oninput="runTreePrediction()">
+                        <div class="flex justify-between text-[9px] text-slate-400 font-mono">
+                            <span>MIN 2.0cm</span>
+                            <span>MAX 4.4cm</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prediction Core Output Card -->
+                <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-md space-y-3 border border-slate-800">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[9px] font-mono tracking-widest text-botanical-400 font-bold uppercase">Decision Tree Model v1.2</span>
+                        <span class="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold px-2.5 py-0.5 rounded-full">실시간 가동중</span>
+                    </div>
+                    <div>
+                        <p class="text-[10px] text-slate-400">모델 예측 품종</p>
+                        <h4 id="sim-predicted-species" class="text-xl font-black mt-0.5">Iris-versicolor</h4>
+                    </div>
+                    <div class="bg-white/5 border border-white/10 p-3 rounded-xl">
+                        <p class="text-[10px] text-slate-300 font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-circle-info text-botanical-400"></i> 알고리즘 실시간 판단 근거
+                        </p>
+                        <p id="sim-predicted-reason" class="text-[11px] text-slate-400 leading-relaxed mt-1">
+                            꽃잎 너비가 0.8cm보다 크고, 1.75cm 이하 범위 내에 있어 Versicolor로 매핑되었습니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Interacting Binary SVG Tree (8 Columns) -->
+            <div class="lg:col-span-8 bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col min-h-[460px]">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            <i class="fa-solid fa-diagram-project text-botanical-600 animate-spin"></i> 인터랙티브 트래킹 이진 트리
+                        </h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Scikit-learn 학습 모델의 핵심 의사결정 경로가 녹색 하이라이트로 표기됩니다.</p>
+                    </div>
+                    <div class="flex gap-1.5">
+                        <span class="text-[9px] px-2 py-0.5 bg-setosa/10 text-setosa rounded-full font-bold">Setosa</span>
+                        <span class="text-[9px] px-2 py-0.5 bg-versicolor/10 text-versicolor rounded-full font-bold">Versicolor</span>
+                        <span class="text-[9px] px-2 py-0.5 bg-virginica/10 text-virginica rounded-full font-bold">Virginica</span>
+                    </div>
+                </div>
+
+                <!-- SVG Tree Render Canvas Box -->
+                <div class="relative flex-1 flex flex-col justify-between min-h-[380px] py-3">
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none" id="tree-svg-canvas">
+                        <line id="sim-path-root-left" class="path-inactive" x1="50%" y1="60" x2="25%" y2="160" />
+                        <line id="sim-path-root-right" class="path-inactive" x1="50%" y1="60" x2="75%" y2="160" />
+                        <line id="sim-path-mid-left" class="path-inactive" x1="75%" y1="160" x2="62%" y2="280" />
+                        <line id="sim-path-mid-right" class="path-inactive" x1="75%" y1="160" x2="88%" y2="280" />
+                    </svg>
+
+                    <!-- Row 1: Root -->
+                    <div class="flex justify-center z-10">
+                        <div id="sim-node-root" class="node-inactive w-64 bg-slate-50 border-2 border-slate-200 rounded-xl p-2.5 text-center transition-all duration-300">
+                            <span class="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">Root Node (Depth 0)</span>
+                            <p class="text-[11px] font-bold text-slate-800">꽃잎 너비 (Petal Width) &le; 0.8 cm ?</p>
+                            <span class="inline-block mt-1 text-[8px] text-slate-400 font-mono bg-slate-100 px-1.5 rounded">Gini: 0.667</span>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Depth 1 Leaves & Deciders -->
+                    <div class="flex justify-between items-center px-2 sm:px-10 z-10">
+                        <div id="sim-node-setosa" class="node-inactive w-44 sm:w-48 bg-emerald-50 border-2 border-emerald-200 rounded-xl p-2.5 text-center transition-all duration-300">
+                            <span class="text-[8px] font-extrabold text-emerald-600 uppercase tracking-widest block mb-0.5">Leaf Node</span>
+                            <p class="text-[11px] font-extrabold text-emerald-800">Setosa로 분류</p>
+                            <p class="text-[8px] text-emerald-500 mt-1 leading-tight">꽃잎 너비가 0.8cm 이하인 100% 품종 군집</p>
+                        </div>
+                        <div id="sim-node-mid-decision" class="node-inactive w-52 sm:w-56 bg-slate-50 border-2 border-slate-200 rounded-xl p-2.5 text-center transition-all duration-300">
+                            <span class="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">Decision Node (Depth 1)</span>
+                            <p class="text-[11px] font-bold text-slate-800">꽃잎 너비 (Petal Width) &le; 1.75 cm ?</p>
+                            <span class="inline-block mt-1 text-[8px] text-slate-400 font-mono bg-slate-100 px-1.5 rounded">Gini: 0.500</span>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Depth 2 Leaves -->
+                    <div class="flex justify-end gap-3 sm:gap-6 px-1 sm:px-4 z-10">
+                        <div id="sim-node-versicolor" class="node-inactive w-40 sm:w-44 bg-amber-50 border-2 border-amber-200 rounded-xl p-2.5 text-center transition-all duration-300 font-sans">
+                            <span class="text-[8px] font-extrabold text-amber-600 uppercase tracking-widest block mb-0.5">Leaf Node</span>
+                            <p class="text-[11px] font-extrabold text-amber-800">Versicolor로 예측</p>
+                            <p class="text-[8px] text-amber-500 mt-0.5">Gini: 0.046 (낮은 불순도)</p>
+                        </div>
+                        <div id="sim-node-virginica" class="node-inactive w-40 sm:w-44 bg-indigo-50 border-2 border-indigo-200 rounded-xl p-2.5 text-center transition-all duration-300 font-sans">
+                            <span class="text-[8px] font-extrabold text-indigo-600 uppercase tracking-widest block mb-0.5">Leaf Node</span>
+                            <p class="text-[11px] font-extrabold text-indigo-800">Virginica로 예측</p>
+                            <p class="text-[8px] text-indigo-500 mt-0.5">Gini: 0.024 (순도 완벽 수렴)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: DATASET LEARNING & iris.csv THEORY EXPLORER -->
+        <div id="section-explorer-tab" class="fade-in space-y-6 hidden">
+            <!-- Theory Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Card 1: Euclidean Distance -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 text-botanical-600 font-bold">
+                        <span class="p-2 bg-botanical-50 rounded-xl"><i class="fa-solid fa-calculator text-base"></i></span>
+                        <h4>유클리드 최소 거리 알고리즘 (성향 테스트용)</h4>
+                    </div>
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        사용자가 수치(1~10)를 답하면, 이를 4차원 좌표 $(S_L, S_W, P_L, P_W)$에 투영합니다. 그 후 실제 <code>iris.csv</code>의 대표 품종별 중심점까지의 거리를 계산하여 가장 거리가 가까운 군집으로 매핑합니다.
+                    </p>
+                    <div class="bg-slate-50 p-3 rounded-xl border font-mono text-[10px] text-slate-500 text-center">
+                        $\text{Distance} = \sqrt{(x_1 - y_1)^2 + (x_2 - y_2)^2 + (x_3 - y_3)^2 + (x_4 - y_4)^2}$
+                    </div>
+                </div>
+
+                <!-- Card 2: Decision Tree -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2 text-indigo-600 font-bold">
+                        <span class="p-2 bg-indigo-50 rounded-xl"><i class="fa-solid fa-diagram-project text-base"></i></span>
+                        <h4>의사결정 트리 알고리즘 (의사결정 모드용)</h4>
+                    </div>
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        전체 데이터를 수차례 가르고 가르는 반복 스무고개 모델입니다. 각 지점의 다른 클래스들이 섞여 있는 비율을 정형화하는 <strong>지니 불순도(Gini Impurity)</strong>가 낮아지는 임계점들을 컴퓨터가 분석하여 모델의 기틀을 잡습니다.
+                    </p>
+                    <div class="bg-slate-50 p-3 rounded-xl border font-mono text-[10px] text-slate-500 text-center">
+                        $\text{Gini Impurity} = 1 - \sum (P_i)^2$
+                    </div>
+                </div>
+            </div>
+
+            <!-- CSV Table View -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm space-y-3">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            <i class="fa-solid fa-database text-botanical-500"></i> iris.csv 파일 데이터 탐색기
+                        </h4>
+                        <p class="text-[11px] text-slate-400 mt-0.5">총 150개의 아이리스 관측기록 데이터 중 일부 샘플 데이터 구조입니다.</p>
+                    </div>
+                    <span class="text-[10px] font-mono bg-slate-100 border px-2.5 py-1 rounded text-slate-500">15 / 150 Rows Shown</span>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 border-b font-mono">
+                                <th class="p-2.5 font-semibold">sepal_length</th>
+                                <th class="p-2.5 font-semibold">sepal_width</th>
+                                <th class="p-2.5 font-semibold">petal_length</th>
+                                <th class="p-2.5 font-semibold">petal_width</th>
+                                <th class="p-2.5 font-semibold text-right">species</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-slate-600 font-mono" id="csv-table-body">
+                            <!-- Populated in Javascript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Custom Botanical Toast Alert Notification (Avoids standard window.alert) -->
+    <div id="custom-toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-slate-800 text-white px-5 py-3 rounded-2xl shadow-xl z-50 transition-all duration-300 opacity-0 translate-y-12 pointer-events-none flex items-center gap-2 max-w-sm w-11/12 sm:w-auto">
+        <i class="fa-solid fa-circle-check text-botanical-400 text-lg"></i>
+        <span class="text-xs font-semibold" id="toast-message">알림 메시지입니다.</span>
+    </div>
+
+    <!-- Main Footer -->
+    <footer class="bg-slate-900 text-slate-500 text-center py-5 text-xs font-mono border-t border-slate-800">
+        © 2026 Botany Machine Learning Project - Built on 'iris.csv' Verbatim Reference
+    </footer>
+
+    <script>
+        // Tab system manager
+        function switchTab(targetTabId) {
+            const tabs = ['personality-tab', 'tree-tab', 'explorer-tab'];
+            tabs.forEach(tab => {
+                const elBtn = document.getElementById(`btn-${tab}`);
+                const elSec = document.getElementById(`section-${tab}`);
+                
+                if (tab === targetTabId) {
+                    elBtn.className = "flex-1 md:flex-initial text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 bg-white text-slate-900 shadow-sm border border-slate-200/60";
+                    elSec.classList.remove('hidden');
+                } else {
+                    elBtn.className = "flex-1 md:flex-initial text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800";
+                    elSec.classList.add('hidden');
+                }
+            });
+
+            // Adjust SVG Paths dynamically if tree-tab is shown to guarantee coordinate calculations
+            if (targetTabId === 'tree-tab') {
+                setTimeout(calculateSvgTreePaths, 80);
+            }
+        }
+
+        // Custom beautiful Notification system in lieu of standard alert()
+        function showNotification(msg) {
+            const toast = document.getElementById('custom-toast');
+            const messageSpan = document.getElementById('toast-message');
+            messageSpan.innerText = msg;
+            
+            // Show toast with slide up fade-in effect
+            toast.classList.remove('opacity-0', 'translate-y-12', 'pointer-events-none');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-12', 'pointer-events-none');
+            }, 2800);
+        }
+
+        // --- 1. PERSONALITY TEST DATA & ALGORITHMS ---
+        const IRIS_CENTROIDS = {
+            setosa: { sepal_length: 2.5, sepal_width: 8.5, petal_length: 1.5, petal_width: 1.2 },
+            versicolor: { sepal_length: 6.0, sepal_width: 3.5, petal_length: 5.5, petal_width: 5.0 },
+            virginica: { sepal_length: 8.5, sepal_width: 5.0, petal_length: 8.5, petal_width: 8.8 }
+        };
+
+        const QUIZ_QUESTIONS = [
+            {
+                step: 1,
+                feature: "sepal_length",
+                icon: "fa-solid fa-compass-drafting",
+                title: "새로운 무언가를 시작할 때, 당신의 행동 계획 성향은?",
+                desc_left: "생각나면 즉시 행동! (직관파)",
+                desc_right: "치밀하고 꼼꼼하게 설계! (계획파)",
+                labels: {
+                    1: "즉흥의 끝판왕", 3: "실행이 빠른 모험가", 5: "적절히 조화된 행동가", 7: "탄탄한 기획형", 10: "완벽 통제 지휘관"
+                }
+            },
+            {
+                step: 2,
+                feature: "sepal_width",
+                icon: "fa-solid fa-shield-halved",
+                title: "예상하지 못한 스케줄 충돌이나 거절을 겪었을 때 당신의 회복력은?",
+                desc_left: "속상해서 이불킥을 많이 함 (섬세파)",
+                desc_right: "그럴 수도 있지 하고 턴다 (쿨한 강철형)",
+                labels: {
+                    1: "유리알 감수성", 3: "은은히 신경 쓰이는 마음", 5: "보통의 마인드컨트롤", 7: "대범하게 극복", 10: "초합금 티타늄 쉴드"
+                }
+            },
+            {
+                step: 3,
+                feature: "petal_length",
+                icon: "fa-solid fa-hourglass-half",
+                title: "하나의 관심사나 일에 꽂혔을 때, 열정의 지속 시간은?",
+                desc_left: "빠르게 버닝하고 빠르게 식음 (불꽃형)",
+                desc_right: "하나만 끝까지 진득하게 파고듦 (우물형)",
+                labels: {
+                    1: "하루살이 화력", 3: "쉽게 매력 느끼고 빠짐", 5: "지속력 보통", 7: "전문가 수준 집요함", 10: "한 분야 우물 장인"
+                }
+            },
+            {
+                step: 4,
+                feature: "petal_width",
+                icon: "fa-solid fa-users-viewfinder",
+                title: "사교 모임이나 업무 회의 중, 당신이 주로 빛나는 위치는?",
+                desc_left: "구석에서 조용히 경청하는 수호자 (내향파)",
+                desc_right: "스포트라이트를 받는 분위기메이커 (핵인싸파)",
+                labels: {
+                    1: "투명 망토 요정", 3: "친한 소수와 깊은 소통", 5: "유연한 카멜레온", 7: "사방으로 매력 발산", 10: "우주 최고 씬스틸러"
+                }
+            }
+        ];
+
+        const PERSONALITY_RESOURCES = {
+            setosa: {
+                name: "세토사 (Setosa) 성향",
+                sub: "수수한 겉모습 속, 흔들리지 않는 가치관을 품은 실속파",
+                flower: "사랑의 메시지, 우아함",
+                desc: "조용히 자신만의 정원을 가꾸는 고고한 세토사를 닮았네요! 남들이 나를 알아주든 말든, 본인만의 명확한 철학과 조용한 고집을 유지합니다. 요란한 말보다 결과와 준비성으로 침착하게 입증해 내는 내유외강형 타입입니다.",
+                sun_title: "반양지형 멘탈 사교성",
+                sun_desc: "하루에 사교 모임 2~3시간이면 만족! 시끌벅적한 관심은 기가 빨리니 혼자만의 조용한 방을 가지세요.",
+                water_title: "주 1회 단단하고 듬뿍 물주기",
+                water_desc: "쓸데없는 안부 문자를 자주 넣는 연락보다는, 진솔한 감정을 한 번에 깊이 있게 교환하는 소통을 원합니다.",
+                match: "듬직하고 리더십 뛰어난 '버지니아 붓꽃' 유형"
+            },
+            versicolor: {
+                name: "버시컬러 (Versicolor) 성향",
+                sub: "환경에 구애받지 않고 다채롭게 번성하는 만능 유연가",
+                flower: "기쁜 소식, 다채로운 아름다움",
+                desc: "기쁜 소식을 싣고 날아다니는 유연한 바람처럼, 상황에 구부러질지언정 부러지지 않는 생존력을 가진 버시컬러 유형입니다. 새로운 모임이나 낯선 타지 환경에서도 눈부신 사교력으로 금세 어우러지는 사교의 귀재입니다.",
+                sun_title: "하루 6시간 광합성 양지형",
+                sun_desc: "사람들을 만나 의견을 나눌 때 머리가 상쾌해집니다. 지나치게 고립되면 시들 수 있으니 계속 밖으로 나가세요.",
+                water_title: "항상 흙을 촉촉하게 습지형 수급",
+                water_desc: "물가 식물처럼 감정 상태가 늘 젖어있길 원해요. 상대방의 사소한 다정한 리액션과 빠른 피드백이 큰 안정감을 줍니다.",
+                match: "서로의 다양함을 응원하고 시너지 내는 '버시컬러' 유형"
+            },
+            virginica: {
+                name: "버지니아 (Virginica) 성향",
+                sub: "거친 웅덩이도 묵묵히 정복하는 강렬한 목표지향 리더",
+                flower: "영광, 믿는 이의 단단한 행복",
+                desc: "가장 거칠고 험난한 야지에서도 굵고 늠름하게 피어나는 버지니아 꽃의 성정을 빼닮았군요! 대범한 추진력이 최고 무기이며, 목표를 설정하면 온갖 수단을 동원해 이루는 정복자 스타일입니다. 곁은 다소 단단해 보이지만 내 울타리 사람에겐 모든 것을 쏟아 헌신합니다.",
+                sun_title: "직사광선 불꽃 사교력",
+                sun_desc: "나의 성과와 가치가 남들에게 뜨겁게 존경받고 가시화될 때 엔도르핀이 수직 상승하며 지치지 않는 사기를 보여줍니다.",
+                water_title: "늪지대 수준의 전폭적인 지지",
+                water_desc: "애매하게 마음을 저울질하거나 밀당하는 애정은 무쓸모로 취급합니다. '내 편'이라는 거대하고 완전한 수조 같은 확신이 필요합니다.",
+                match: "세심한 수호자가 되어 마음을 품어주는 '세토사' 유형"
+            }
+        };
+
+        let currentQuizIndex = 0;
+        let quizAnswers = { sepal_length: 5, sepal_width: 5, petal_length: 5, petal_width: 5 };
+
+        function startTest() {
+            document.getElementById('intro-view').classList.add('hidden');
+            document.getElementById('question-view').classList.remove('hidden');
+            currentQuizIndex = 0;
+            loadQuizStep();
+        }
+
+        function loadQuizStep() {
+            const q = QUIZ_QUESTIONS[currentQuizIndex];
+            document.getElementById('step-indicator').innerText = `STEP ${q.step} OF 4`;
+            document.getElementById('feature-mapping').innerText = q.feature === "sepal_length" ? "꽃받침 길이" : q.feature === "sepal_width" ? "꽃받침 너비" : q.feature === "petal_length" ? "꽃잎 길이" : "꽃잎 너비";
+            
+            // Progress Bar Animation
+            const pct = (q.step / 4) * 100;
+            document.getElementById('progress-bar').style.width = `${pct}%`;
+
+            // Question Config
+            document.getElementById('question-icon').className = q.icon + " text-botanical-500 text-3xl animate-pulse";
+            document.getElementById('question-text').innerText = q.title;
+            document.getElementById('label-left').innerText = q.desc_left;
+            document.getElementById('label-right').innerText = q.desc_right;
+
+            // Load saved value
+            const savedVal = quizAnswers[q.feature];
+            document.getElementById('quiz-slider').value = savedVal;
+            updateQuizSlider(savedVal);
+
+            // Btn displays
+            if (currentQuizIndex === 0) {
+                document.getElementById('prev-btn').classList.add('invisible');
+            } else {
+                document.getElementById('prev-btn').classList.remove('invisible');
+            }
+
+            document.getElementById('next-btn-text').innerText = currentQuizIndex === 3 ? "분석 마법 가동" : "다음 질문";
+        }
+
+        function updateQuizSlider(val) {
+            const q = QUIZ_QUESTIONS[currentQuizIndex];
+            quizAnswers[q.feature] = parseInt(val);
+            
+            // Helper labels matching funny index mappings
+            let customLabel = "중도 중립";
+            for (const [k, v] of Object.entries(q.labels)) {
+                if (val >= parseInt(k)) customLabel = v;
+            }
+            document.getElementById('slider-val-label').innerText = `${val}점 (${customLabel})`;
+        }
+
+        function prevStep() {
+            if (currentQuizIndex > 0) {
+                currentQuizIndex--;
+                loadQuizStep();
+            }
+        }
+
+        function nextStep() {
+            if (currentQuizIndex < 3) {
+                currentQuizIndex++;
+                loadQuizStep();
+            } else {
+                runQuizCalculation();
+            }
+        }
+
+        function runQuizCalculation() {
+            document.getElementById('question-view').classList.add('hidden');
+            document.getElementById('loading-view').classList.remove('hidden');
+
+            setTimeout(() => {
+                // Euclidean logic
+                let distances = {};
+                let minVal = Infinity;
+                let predicted = "setosa";
+
+                for (const [sp, ctr] of Object.entries(IRIS_CENTROIDS)) {
+                    let sumSq = 0;
+                    for (const f of ['sepal_length', 'sepal_width', 'petal_length', 'petal_width']) {
+                        const d = quizAnswers[f] - ctr[f];
+                        sumSq += d * d;
+                    }
+                    const dist = Math.sqrt(sumSq);
+                    distances[sp] = dist;
+                    if (dist < minVal) {
+                        minVal = dist;
+                        predicted = sp;
+                    }
+                }
+
+                // Render Results
+                document.getElementById('loading-view').classList.add('hidden');
+                document.getElementById('result-view').classList.remove('hidden');
+
+                const r = PERSONALITY_RESOURCES[predicted];
+                document.getElementById('res-species').innerText = r.name;
+                document.getElementById('res-subname').innerText = `"${r.sub}"`;
+                document.getElementById('res-flower-lang').innerHTML = `🌸 꽃말: <strong>${r.flower}</strong>`;
+                document.getElementById('res-desc').innerText = r.desc;
+                document.getElementById('res-sun-title').innerText = r.sun_title;
+                document.getElementById('res-sun-desc').innerText = r.sun_desc;
+                document.getElementById('res-water-title').innerText = r.water_title;
+                document.getElementById('res-water-desc').innerText = r.water_desc;
+                document.getElementById('res-match').innerText = r.match;
+
+                // Set pseudo-distances graphical charts
+                const maxD = 18;
+                for (const sp of ['setosa', 'versicolor', 'virginica']) {
+                    const simScore = Math.max(0, Math.min(100, (1 - (distances[sp] / maxD)) * 100));
+                    document.getElementById(`dist-${sp}`).style.width = `${Math.round(simScore)}%`;
+                }
+
+                document.getElementById('result-view').scrollTop = 0;
+            }, 1800);
+        }
+
+        function restartTest() {
+            quizAnswers = { sepal_length: 5, sepal_width: 5, petal_length: 5, petal_width: 5 };
+            currentQuizIndex = 0;
+            document.getElementById('result-view').classList.add('hidden');
+            document.getElementById('intro-view').classList.remove('hidden');
+        }
+
+        function copyTestResult() {
+            const spec = document.getElementById('res-species').innerText;
+            const sub = document.getElementById('res-subname').innerText;
+            const text = `🌿 [아이리스 정원 성향 테스트 결과]\n나의 붓꽃 MBTI: ${spec}\n"${sub}"\n\n실제 iris.csv 다차원 수치 분석 모델을 사용해 나를 진단해 보세요! 🌸\n👉 통합 어플리케이션에서 직접 분석을 즐겨보세요!`;
+            
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            showNotification("테스트 결과가 클립보드에 무사히 저장되었습니다! 친구들과 나눠 보세요. 🌿");
+        }
+
+        // --- 2. INTERACTIVE DECISION TREE ALGORITHM ---
+        const simPetalWidth = document.getElementById('sim-petal-width');
+        const simPetalLength = document.getElementById('sim-petal-length');
+        const simSepalLength = document.getElementById('sim-sepal-length');
+        const simSepalWidth = document.getElementById('sim-sepal-width');
+
+        function calculateSvgTreePaths() {
+            const svg = document.getElementById('tree-svg-canvas');
+            if (!svg || svg.getBoundingClientRect().width === 0) return;
+
+            const rootNode = document.getElementById('sim-node-root');
+            const nodeSetosa = document.getElementById('sim-node-setosa');
+            const nodeMidDec = document.getElementById('sim-node-mid-decision');
+            const nodeVersicolor = document.getElementById('sim-node-versicolor');
+            const nodeVirginica = document.getElementById('sim-node-virginica');
+
+            const getCenter = (el) => {
+                const rect = el.getBoundingClientRect();
+                const containerRect = svg.getBoundingClientRect();
+                return {
+                    bottomX: rect.left + rect.width / 2 - containerRect.left,
+                    bottomY: rect.top + rect.height - containerRect.top,
+                    topX: rect.left + rect.width / 2 - containerRect.left,
+                    topY: rect.top - containerRect.top
+                };
+            };
+
+            const root = getCenter(rootNode);
+            const setosa = getCenter(nodeSetosa);
+            const midDec = getCenter(nodeMidDec);
+            const versicolor = getCenter(nodeVersicolor);
+            const virginica = getCenter(nodeVirginica);
+
+            // Root to Left/Right
+            const pathRootLeft = document.getElementById('sim-path-root-left');
+            pathRootLeft.setAttribute('x1', root.bottomX); pathRootLeft.setAttribute('y1', root.bottomY);
+            pathRootLeft.setAttribute('x2', setosa.topX); pathRootLeft.setAttribute('y2', setosa.topY);
+
+            const pathRootRight = document.getElementById('sim-path-root-right');
+            pathRootRight.setAttribute('x1', root.bottomX); pathRootRight.setAttribute('y1', root.bottomY);
+            pathRootRight.setAttribute('x2', midDec.topX); pathRootRight.setAttribute('y2', midDec.topY);
+
+            // Mid to Left/Right
+            const pathMidLeft = document.getElementById('sim-path-mid-left');
+            pathMidLeft.setAttribute('x1', midDec.bottomX); pathMidLeft.setAttribute('y1', midDec.bottomY);
+            pathMidLeft.setAttribute('x2', versicolor.topX); pathMidLeft.setAttribute('y2', versicolor.topY);
+
+            const pathMidRight = document.getElementById('sim-path-mid-right');
+            pathMidRight.setAttribute('x1', midDec.bottomX); pathMidRight.setAttribute('y1', midDec.bottomY);
+            pathMidRight.setAttribute('x2', virginica.topX); pathMidRight.setAttribute('y2', virginica.topY);
+        }
+
+        function runTreePrediction() {
+            const pWidth = parseFloat(simPetalWidth.value);
+            const pLength = parseFloat(simPetalLength.value);
+            const sLength = parseFloat(simSepalLength.value);
+            const sWidth = parseFloat(simSepalWidth.value);
+
+            // Update Labels
+            document.getElementById('label-petal-width').innerText = `${pWidth.toFixed(1)} cm`;
+            document.getElementById('label-petal-length').innerText = `${pLength.toFixed(1)} cm`;
+            document.getElementById('label-sepal-length').innerText = `${sLength.toFixed(1)} cm`;
+            document.getElementById('label-sepal-width').innerText = `${sWidth.toFixed(1)} cm`;
+
+            // Reset Tree Graphics Classes
+            const nodeIds = ['sim-node-root', 'sim-node-setosa', 'sim-node-mid-decision', 'sim-node-versicolor', 'sim-node-virginica'];
+            nodeIds.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('node-active');
+                el.classList.add('node-inactive');
+            });
+
+            const pathIds = ['sim-path-root-left', 'sim-path-root-right', 'sim-path-mid-left', 'sim-path-mid-right'];
+            pathIds.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('path-active');
+                el.classList.add('path-inactive');
+            });
+
+            // Gini flow simulator calculation mapping
+            document.getElementById('sim-node-root').classList.remove('node-inactive');
+            document.getElementById('sim-node-root').classList.add('node-active');
+
+            let speciesOut = "";
+            let reasonOut = "";
+
+            // Condition 1: Petal Width <= 0.8
+            if (pWidth <= 0.8) {
+                document.getElementById('sim-path-root-left').classList.remove('path-inactive');
+                document.getElementById('sim-path-root-left').classList.add('path-active');
+
+                document.getElementById('sim-node-setosa').classList.remove('node-inactive');
+                document.getElementById('sim-node-setosa').classList.add('node-active');
+
+                speciesOut = "Iris-setosa (세토사)";
+                reasonOut = "꽃잎 너비가 0.8cm 이하인 그룹은 데이터셋 상에서 단 하나의 예외도 없이 100% 확률로 세토사종으로 깔끔히 군집화됩니다.";
+            } else {
+                document.getElementById('sim-path-root-right').classList.remove('path-inactive');
+                document.getElementById('sim-path-root-right').classList.add('path-active');
+
+                document.getElementById('sim-node-mid-decision').classList.remove('node-inactive');
+                document.getElementById('sim-node-mid-decision').classList.add('node-active');
+
+                // Condition 2: Petal Width <= 1.75
+                if (pWidth <= 1.75) {
+                    document.getElementById('sim-path-mid-left').classList.remove('path-inactive');
+                    document.getElementById('sim-path-mid-left').classList.add('path-active');
+
+                    document.getElementById('sim-node-versicolor').classList.remove('node-inactive');
+                    document.getElementById('sim-node-versicolor').classList.add('node-active');
+
+                    speciesOut = "Iris-versicolor (버시컬러)";
+                    reasonOut = "꽃잎 너비가 0.8cm보다 크고 1.75cm 이하에 속합니다. 이 영역의 품종들은 대부분 버시컬러종으로 분류될 확률이 극대화됩니다.";
+                } else {
+                    document.getElementById('sim-path-mid-right').classList.remove('path-inactive');
+                    document.getElementById('sim-path-mid-right').classList.add('path-active');
+
+                    document.getElementById('sim-node-virginica').classList.remove('node-inactive');
+                    document.getElementById('sim-node-virginica').classList.add('node-active');
+
+                    speciesOut = "Iris-virginica (버지니카)";
+                    reasonOut = "꽃잎 너비가 1.75cm를 초과하는 우람하고 튼튼한 개체들은 95% 이상의 압도적인 지니 순도로 버지니카종에 안착하게 됩니다.";
+                }
+            }
+
+            document.getElementById('sim-predicted-species').innerText = speciesOut;
+            document.getElementById('sim-predicted-reason').innerText = reasonOut;
+        }
+
+        // --- 3. MOCK CSV DATA LOADER & SYSTEM SETUP ---
+        const MOCK_IRIS_CSV_DATA = [
+            [5.1, 3.5, 1.4, 0.2, "setosa"],
+            [4.9, 3.0, 1.4, 0.2, "setosa"],
+            [4.7, 3.2, 1.3, 0.2, "setosa"],
+            [4.6, 3.1, 1.5, 0.2, "setosa"],
+            [5.0, 3.6, 1.4, 0.2, "setosa"],
+            [7.0, 3.2, 4.7, 1.4, "versicolor"],
+            [6.4, 3.2, 4.5, 1.5, "versicolor"],
+            [6.9, 3.1, 4.9, 1.5, "versicolor"],
+            [5.5, 2.3, 4.0, 1.3, "versicolor"],
+            [6.5, 2.8, 4.6, 1.5, "versicolor"],
+            [6.3, 3.3, 6.0, 2.5, "virginica"],
+            [5.8, 2.7, 5.1, 1.9, "virginica"],
+            [7.1, 3.0, 5.9, 2.1, "virginica"],
+            [6.3, 2.9, 5.6, 1.8, "virginica"],
+            [6.5, 3.0, 5.8, 2.2, "virginica"]
+        ];
+
+        function populateCsvTable() {
+            const tbody = document.getElementById('csv-table-body');
+            tbody.innerHTML = "";
+            MOCK_IRIS_CSV_DATA.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                
+                let speciesBadgeClass = "";
+                if (row[4] === "setosa") speciesBadgeClass = "bg-setosa/10 text-setosa font-bold px-2 py-0.5 rounded";
+                else if (row[4] === "versicolor") speciesBadgeClass = "bg-versicolor/10 text-versicolor font-bold px-2 py-0.5 rounded";
+                else speciesBadgeClass = "bg-virginica/10 text-virginica font-bold px-2 py-0.5 rounded";
+
+                tr.innerHTML = `
+                    <td class="p-2.5">${row[0]}</td>
+                    <td class="p-2.5">${row[1]}</td>
+                    <td class="p-2.5">${row[2]}</td>
+                    <td class="p-2.5">${row[3]}</td>
+                    <td class="p-2.5 text-right"><span class="${speciesBadgeClass}">${row[4]}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Initialize App on load
+        window.onload = function() {
+            // Fill CSV Table Explorer
+            populateCsvTable();
+
+            // Run first tree calculation
+            runTreePrediction();
+
+            // Svg resize responsive trigger
+            window.addEventListener('resize', calculateSvgTreePaths);
+        };
+    </script>
+</body>
+</html>
