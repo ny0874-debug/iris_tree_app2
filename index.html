@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iris 의사결정 예측 알고리즘 시뮬레이터</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans KR', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        },
+                        setosa: '#10b981',     // Emerald
+                        versicolor: '#f59e0b', // Amber
+                        virginica: '#6366f1'   // Indigo
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom scrollbars for clean UI */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        /* Active glowing classes */
+        .node-active {
+            transform: scale(1.03);
+            border-color: #22c55e !important;
+            box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.3), 0 8px 10px -6px rgba(34, 197, 94, 0.3);
+            background-color: #ffffff !important;
+            opacity: 1 !important;
+            z-index: 10;
+        }
+        .path-active {
+            stroke: #22c55e !important;
+            stroke-width: 3px !important;
+            stroke-dasharray: 5;
+            animation: dash 1s linear infinite;
+        }
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -10;
+            }
+        }
+        .node-inactive {
+            opacity: 0.45;
+            filter: grayscale(20%);
+        }
+        .path-inactive {
+            stroke: #cbd5e1 !important;
+            stroke-width: 1.5px !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+    <!-- Main Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-brand-100 rounded-xl text-brand-600">
+                    <i class="fa-solid fa-diagram-project text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Iris 의사결정 예측 시뮬레이터</h1>
+                    <p class="text-xs text-slate-500">Decision Tree Machine Learning Algorithm Visualizer</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-mono bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg text-slate-600 flex items-center gap-1.5">
+                    <i class="fa-solid fa-database text-brand-500"></i> Dataset: iris.csv
+                </span>
+                <a href="#code-section" class="text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-code"></i> 파이썬 코드 보기
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Side: Sliders & Controls (4 Columns) -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                <div class="border-b border-slate-100 pb-3">
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-brand-600"></i> 피처(Feature) 입력 변수
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">붓꽃의 4가지 부위 측정값을 조정하여 예측 경로를 실시간으로 추적하세요.</p>
+                </div>
+
+                <!-- Slider 1: Petal Width (가장 중요한 분기 기준) -->
+                <div class="space-y-2 bg-emerald-50/30 p-4 rounded-xl border border-emerald-100/50">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                            꽃잎 너비 <span class="text-xs font-normal text-slate-400">(Petal Width)</span>
+                        </span>
+                        <span id="val-petal-width" class="font-mono font-bold text-indigo-600 bg-white border px-2 py-0.5 rounded shadow-sm">1.5 cm</span>
+                    </div>
+                    <input type="range" id="input-petal-width" min="0.1" max="2.5" step="0.1" value="1.5" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                           oninput="updatePrediction()">
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                        <span>MIN 0.1cm</span>
+                        <span>MAX 2.5cm</span>
+                    </div>
+                </div>
+
+                <!-- Slider 2: Petal Length -->
+                <div class="space-y-2 bg-blue-50/30 p-4 rounded-xl border border-blue-100/50">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                            꽃잎 길이 <span class="text-xs font-normal text-slate-400">(Petal Length)</span>
+                        </span>
+                        <span id="val-petal-length" class="font-mono font-bold text-blue-600 bg-white border px-2 py-0.5 rounded shadow-sm">4.5 cm</span>
+                    </div>
+                    <input type="range" id="input-petal-length" min="1.0" max="6.9" step="0.1" value="4.5" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                           oninput="updatePrediction()">
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                        <span>MIN 1.0cm</span>
+                        <span>MAX 6.9cm</span>
+                    </div>
+                </div>
+
+                <!-- Slider 3: Sepal Length -->
+                <div class="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                            꽃받침 길이 <span class="text-xs font-normal text-slate-400">(Sepal Length)</span>
+                        </span>
+                        <span id="val-sepal-length" class="font-mono font-bold text-amber-600 bg-white border px-2 py-0.5 rounded shadow-sm">5.8 cm</span>
+                    </div>
+                    <input type="range" id="input-sepal-length" min="4.3" max="7.9" step="0.1" value="5.8" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                           oninput="updatePrediction()">
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                        <span>MIN 4.3cm</span>
+                        <span>MAX 7.9cm</span>
+                    </div>
+                </div>
+
+                <!-- Slider 4: Sepal Width -->
+                <div class="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-teal-500"></span>
+                            꽃받침 너비 <span class="text-xs font-normal text-slate-400">(Sepal Width)</span>
+                        </span>
+                        <span id="val-sepal-width" class="font-mono font-bold text-teal-600 bg-white border px-2 py-0.5 rounded shadow-sm">3.0 cm</span>
+                    </div>
+                    <input type="range" id="input-sepal-width" min="2.0" max="4.4" step="0.1" value="3.0" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                           oninput="updatePrediction()">
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                        <span>MIN 2.0cm</span>
+                        <span>MAX 4.4cm</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prediction Result Card -->
+            <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-lg border border-slate-700 space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs uppercase font-bold tracking-wider text-brand-500">Predictive Model Output</span>
+                    <span class="bg-brand-500/10 text-brand-500 text-[10px] px-2.5 py-1 rounded-full font-bold border border-brand-500/20">Decision Tree v1.0</span>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400">알고리즘 최종 예측 결과</p>
+                    <h3 id="predicted-species-name" class="text-2xl font-black mt-1 text-white">Iris-versicolor (버시컬러)</h3>
+                </div>
+                <div class="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-2">
+                    <div class="flex items-center gap-2 text-xs text-slate-300">
+                        <i class="fa-solid fa-leaf text-brand-500"></i>
+                        <span>해당 품종의 핵심 자생/관리 정보</span>
+                    </div>
+                    <p id="predicted-species-desc" class="text-xs text-slate-400 leading-relaxed">
+                        주로 습지와 물가에서 풍성하게 피어나며 적응력이 매우 뛰어난 강인한 성격의 품종입니다.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Interactive Decision Tree Flow (8 Columns) -->
+        <div class="lg:col-span-8 flex flex-col space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-network-wired text-brand-600"></i> 알고리즘 의사결정 경로 추적
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">실제 Scikit-Learn 모델이 학습한 이진 트리(Binary Tree) 분기 구조입니다.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <span class="text-xs px-2.5 py-1 bg-setosa/15 text-setosa rounded font-bold">Setosa</span>
+                        <span class="text-xs px-2.5 py-1 bg-versicolor/15 text-versicolor rounded font-bold">Versicolor</span>
+                        <span class="text-xs px-2.5 py-1 bg-virginica/15 text-virginica rounded font-bold">Virginica</span>
+                    </div>
+                </div>
+
+                <!-- Responsive Visual Tree Board -->
+                <div class="relative flex-1 flex flex-col justify-between min-h-[480px] py-4 select-none">
+                    
+                    <!-- SVG connection lines wrapper to dynamically draw connection paths -->
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none" id="tree-svg">
+                        <line id="path-root-left" class="path-inactive" x1="50%" y1="60" x2="25%" y2="170" />
+                        <line id="path-root-right" class="path-inactive" x1="50%" y1="60" x2="75%" y2="170" />
+                        <line id="path-mid-left" class="path-inactive" x1="75%" y1="170" x2="62%" y2="300" />
+                        <line id="path-mid-right" class="path-inactive" x1="75%" y1="170" x2="88%" y2="300" />
+                    </svg>
+
+                    <!-- Root Node Row -->
+                    <div class="flex justify-center z-10">
+                        <div id="node-root" class="node-inactive w-72 bg-slate-50 border-2 border-slate-200 rounded-xl p-3.5 text-center transition-all duration-300">
+                            <div class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Root Node (Depth 0)</div>
+                            <div class="text-xs font-bold text-slate-800" id="text-node-root-cond">꽃잎 너비 (Petal Width) &le; 0.8 cm ?</div>
+                            <div class="mt-2 text-[10px] text-slate-400 font-mono bg-slate-100 rounded py-0.5">지니 불순도(Gini): 0.667</div>
+                        </div>
+                    </div>
+
+                    <!-- Depth 1 Row -->
+                    <div class="flex justify-between items-center px-4 sm:px-12 z-10">
+                        <!-- Left Leaf (Pure Setosa) -->
+                        <div id="node-leaf-setosa" class="node-inactive w-56 bg-emerald-50 border-2 border-emerald-200 rounded-xl p-3.5 text-center transition-all duration-300">
+                            <div class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-1">
+                                <i class="fa-solid fa-square-check"></i> Leaf Node
+                            </div>
+                            <div class="text-xs font-extrabold text-emerald-800">Iris-setosa 로 예측 완료</div>
+                            <p class="text-[10px] text-emerald-600/80 mt-1 leading-snug">꽃잎 너비가 0.8cm 이하인 그룹은 100% 확률로 세토사종에 수렴합니다.</p>
+                            <div class="mt-2 text-[10px] text-emerald-700 font-mono bg-emerald-100/50 rounded py-0.5">Gini: 0.0 (완전 순수)</div>
+                        </div>
+
+                        <!-- Right Decision Node -->
+                        <div id="node-mid-decision" class="node-inactive w-64 bg-slate-50 border-2 border-slate-200 rounded-xl p-3.5 text-center transition-all duration-300">
+                            <div class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Decision Node (Depth 1)</div>
+                            <div class="text-xs font-bold text-slate-800" id="text-node-mid-cond">꽃잎 너비 (Petal Width) &le; 1.75 cm ?</div>
+                            <div class="mt-2 text-[10px] text-slate-400 font-mono bg-slate-100 rounded py-0.5">Gini: 0.500 (적절한 불확실성)</div>
+                        </div>
+                    </div>
+
+                    <!-- Depth 2 Leaf Row -->
+                    <div class="flex justify-end gap-4 sm:gap-12 px-2 sm:px-8 z-10">
+                        <!-- Mid-Left Leaf (Mostly Versicolor) -->
+                        <div id="node-leaf-versicolor" class="node-inactive w-52 bg-amber-50 border-2 border-amber-200 rounded-xl p-3.5 text-center transition-all duration-300">
+                            <div class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1">
+                                <i class="fa-solid fa-square-check"></i> Leaf Node
+                            </div>
+                            <div class="text-xs font-extrabold text-amber-800">Iris-versicolor 로 예측</div>
+                            <div class="mt-2 text-[10px] text-amber-700 font-mono bg-amber-100/50 rounded py-0.5">Gini: 0.046 (매우 낮음)</div>
+                        </div>
+
+                        <!-- Mid-Right Leaf (Mostly Virginica) -->
+                        <div id="node-leaf-virginica" class="node-inactive w-52 bg-indigo-50 border-2 border-indigo-200 rounded-xl p-3.5 text-center transition-all duration-300">
+                            <div class="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 uppercase tracking-widest mb-1">
+                                <i class="fa-solid fa-square-check"></i> Leaf Node
+                            </div>
+                            <div class="text-xs font-extrabold text-indigo-800">Iris-virginica 로 예측</div>
+                            <div class="mt-2 text-[10px] text-indigo-700 font-mono bg-indigo-100/50 rounded py-0.5">Gini: 0.024 (순도 극도로 높음)</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Python ML Code & Educational Section -->
+    <section id="code-section" class="bg-slate-900 text-slate-300 border-t border-slate-800 py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+            <div class="text-center max-w-2xl mx-auto">
+                <span class="text-xs font-bold uppercase tracking-widest text-brand-500">Python Machine Learning Tutorial</span>
+                <h2 class="text-2xl sm:text-3xl font-black text-white mt-1">의사결정나무 예측 알고리즘 코드</h2>
+                <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                    실제 Python 환경에서 `scikit-learn`을 사용하여 동일한 의사결정 모델을 학습하고 구조를 파일이나 텍스트로 내보내는 정석적인 소스코드입니다.
+                </p>
+            </div>
+
+            <!-- Code and Explanation Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Python Code Display (7 Columns) -->
+                <div class="lg:col-span-7 space-y-3">
+                    <div class="flex justify-between items-center bg-slate-800 px-4 py-2 rounded-t-xl border-b border-slate-700 text-xs">
+                        <span class="font-mono text-slate-400">iris_decision_tree_classifier.py</span>
+                        <button onclick="copyCode()" class="text-slate-300 hover:text-white transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-copy"></i> 코드 복사하기
+                        </button>
+                    </div>
+                    <pre class="bg-slate-950 p-5 rounded-b-xl overflow-x-auto text-xs font-mono text-emerald-400 leading-relaxed border border-slate-800/80 shadow-inner">
+<code>import pandas as pd
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier, export_text
+
+# 1. iris 표준 학습용 데이터셋 적재
+iris_data = load_iris()
+X = pd.DataFrame(iris_data.data, columns=iris_data.feature_names)
+y = iris_data.target
+
+# 2. 데이터 학습용(80%) 및 검증용(20%) 분할
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# 3. 의사결정나무 모델 초기화 (과적합 방지를 위해 최대 깊이 3 설정)
+model = DecisionTreeClassifier(max_depth=3, random_state=42)
+model.fit(X_train, y_train)
+
+# 4. 모델 예측 정확도 테스트 및 출력
+accuracy = model.score(X_test, y_test)
+print(f"모델의 실측 데이터 정확도: {accuracy * 100:.2f}%")
+
+# 5. 실시간 분기 시나리오를 텍스트로 가독화
+tree_rules_text = export_text(model, feature_names=list(X.columns))
+print("\n[의사결정 알고리즘 분기 규칙]")
+print(tree_rules_text)</code></pre>
+                </div>
+
+                <!-- Theory Explanation (5 Columns) -->
+                <div class="lg:col-span-5 space-y-6 flex flex-col justify-center">
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-lightbulb text-amber-400"></i> 알고리즘의 작동 메커니즘
+                        </h4>
+                        
+                        <div class="space-y-4 text-xs text-slate-400 leading-relaxed">
+                            <div class="bg-slate-800/50 border-l-4 border-brand-500 p-4 rounded">
+                                <h5 class="font-bold text-white mb-1">1. 지니 불순도 (Gini Impurity)</h5>
+                                <p>각 노드의 데이터가 얼마나 다른 품종들과 혼합되어 있는지를 수치화합니다. $0.0$에 가까울수록 특정 종만 모여 있는 100% 순수한 상태를 의미하며, 의사결정나무는 이 불순도를 최소화하는 방향으로 영역을 분기시킵니다.</p>
+                            </div>
+                            
+                            <div class="bg-slate-800/50 border-l-4 border-indigo-500 p-4 rounded">
+                                <h5 class="font-bold text-white mb-1">2. 정보 획득 (Information Gain)</h5>
+                                <p>부모 노드에서 자식 노드로 쪼개질 때 지니 불순도가 대폭 감소하는 최적의 임계치(Threshold)와 피처(Feature)를 찾아내어 학습이 전개됩니다.</p>
+                            </div>
+
+                            <div class="bg-slate-800/50 border-l-4 border-amber-500 p-4 rounded">
+                                <h5 class="font-bold text-white mb-1">3. 꽃잎 너비가 왜 가장 위에 있을까요?</h5>
+                                <p>아이리스 데이터셋에서 세토사(Setosa)종은 꽃잎 너비가 0.8cm보다 작기 때문에, 이 조건 하나만으로 완벽하게 분류됩니다. 따라서 가장 효율적으로 불순도를 낮출 수 있는 최우선 분기 조건이 맨 위에 놓이게 됩니다.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-950 text-slate-500 text-center py-6 text-xs font-mono border-t border-slate-900">
+        © 2026 Botany Decision Optimization Machine Learning Project
+    </footer>
+
+    <script>
+        // Dictionary for care guidelines mapping for the prediction output
+        const SPECIES_CARE_DB = {
+            setosa: {
+                name: "Iris-setosa (세토사)",
+                desc: "꽃잎 너비가 극도로 얇고 아담한 개체로, 추위에 아주 우수하고 내강외유형의 순수한 품종입니다. 겉흙이 보송해졌을 때 물을 듬뿍 주며, 조용한 반양지 환경을 대단히 선호합니다."
+            },
+            versicolor: {
+                name: "Iris-versicolor (버시컬러)",
+                desc: "어디에서나 화려하고 눈부시게 적응하는 습지 출신 식물입니다. 흙이 완전히 건조해지지 않도록 늘 촉촉하게 물을 수급하며, 햇빛을 만끽할 수 있는 창가 자리에 배치하는 것을 추천합니다."
+            },
+            virginica: {
+                name: "Iris-virginica (버지니아)",
+                desc: "도전적인 물가나 거친 야외 환경에서 가장 굵고 웅장하게 자라나는 카리스마가 뛰어난 품종입니다. 수생 식물처럼 물이 항상 풍부하게 머무르는 극도로 습한 토양과 직사광선을 사랑합니다."
+            }
+        };
+
+        // UI Element selectors
+        const elPetalWidth = document.getElementById('input-petal-width');
+        const elPetalLength = document.getElementById('input-petal-length');
+        const elSepalLength = document.getElementById('input-sepal-length');
+        const elSepalWidth = document.getElementById('input-sepal-width');
+
+        // Dynamically compute positioning coordinates for SVG connection lines
+        function adjustSvgPaths() {
+            const svg = document.getElementById('tree-svg');
+            const rootNode = document.getElementById('node-root');
+            const leafSetosa = document.getElementById('node-leaf-setosa');
+            const midDecision = document.getElementById('node-mid-decision');
+            const leafVersicolor = document.getElementById('node-leaf-versicolor');
+            const leafVirginica = document.getElementById('node-leaf-virginica');
+
+            // Find center boundaries relative to the visual tree container
+            const getBoxCenter = (el) => {
+                const rect = el.getBoundingClientRect();
+                const containerRect = svg.getBoundingClientRect();
+                return {
+                    x: rect.left + rect.width / 2 - containerRect.left,
+                    y: rect.top + rect.height / 2 - containerRect.top,
+                    topX: rect.left + rect.width / 2 - containerRect.left,
+                    topY: rect.top - containerRect.top,
+                    bottomX: rect.left + rect.width / 2 - containerRect.left,
+                    bottomY: rect.top + rect.height - containerRect.top
+                };
+            };
+
+            const root = getBoxCenter(rootNode);
+            const setosa = getBoxCenter(leafSetosa);
+            const midDec = getBoxCenter(midDecision);
+            const versicolor = getBoxCenter(leafVersicolor);
+            const virginica = getBoxCenter(leafVirginica);
+
+            // Connect Root to Left/Right children
+            const lineRootLeft = document.getElementById('path-root-left');
+            lineRootLeft.setAttribute('x1', root.bottomX);
+            lineRootLeft.setAttribute('y1', root.bottomY);
+            lineRootLeft.setAttribute('x2', setosa.topX);
+            lineRootLeft.setAttribute('y2', setosa.topY);
+
+            const lineRootRight = document.getElementById('path-root-right');
+            lineRootRight.setAttribute('x1', root.bottomX);
+            lineRootRight.setAttribute('y1', root.bottomY);
+            lineRootRight.setAttribute('x2', midDec.topX);
+            lineRootRight.setAttribute('y2', midDec.topY);
+
+            // Connect Mid decision to lower depth leaves
+            const lineMidLeft = document.getElementById('path-mid-left');
+            lineMidLeft.setAttribute('x1', midDec.bottomX);
+            lineMidLeft.setAttribute('y1', midDec.bottomY);
+            lineMidLeft.setAttribute('x2', versicolor.topX);
+            lineMidLeft.setAttribute('y2', versicolor.topY);
+
+            const lineMidRight = document.getElementById('path-mid-right');
+            lineMidRight.setAttribute('x1', midDec.bottomX);
+            lineMidRight.setAttribute('y1', midDec.bottomY);
+            lineMidRight.setAttribute('x2', virginica.topX);
+            lineMidRight.setAttribute('y2', virginica.topY);
+        }
+
+        // Executed immediately whenever user slides inputs to recalculate prediction and highlight flow
+        function updatePrediction() {
+            // Get current scalar inputs
+            const pWidth = parseFloat(elPetalWidth.value);
+            const pLength = parseFloat(elPetalLength.value);
+            const sLength = parseFloat(elSepalLength.value);
+            const sWidth = parseFloat(elSepalWidth.value);
+
+            // Render current values on the controller labels
+            document.getElementById('val-petal-width').innerText = `${pWidth.toFixed(1)} cm`;
+            document.getElementById('val-petal-length').innerText = `${pLength.toFixed(1)} cm`;
+            document.getElementById('val-sepal-length').innerText = `${sLength.toFixed(1)} cm`;
+            document.getElementById('val-sepal-width').innerText = `${sWidth.toFixed(1)} cm`;
+
+            // Clear previous highlight classes
+            const nodes = ['node-root', 'node-leaf-setosa', 'node-mid-decision', 'node-leaf-versicolor', 'node-leaf-virginica'];
+            nodes.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('node-active');
+                el.classList.add('node-inactive');
+            });
+
+            const paths = ['path-root-left', 'path-root-right', 'path-mid-left', 'path-mid-right'];
+            paths.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('path-active');
+                el.classList.add('path-inactive');
+            });
+
+            // Start decision tree navigation
+            document.getElementById('node-root').classList.add('node-active');
+            document.getElementById('node-root').classList.remove('node-inactive');
+
+            let finalPredictedSpecies = '';
+
+            // Split Rule 1: Petal Width <= 0.8 cm
+            if (pWidth <= 0.8) {
+                // Leaf Setosa reaches final destination
+                document.getElementById('path-root-left').classList.add('path-active');
+                document.getElementById('path-root-left').classList.remove('path-inactive');
+
+                const leafSetosa = document.getElementById('node-leaf-setosa');
+                leafSetosa.classList.add('node-active');
+                leafSetosa.classList.remove('node-inactive');
+
+                finalPredictedSpecies = 'setosa';
+            } else {
+                // Otherwise move right to Depth 1 node
+                document.getElementById('path-root-right').classList.add('path-active');
+                document.getElementById('path-root-right').classList.remove('path-inactive');
+
+                const midDecision = document.getElementById('node-mid-decision');
+                midDecision.classList.add('node-active');
+                midDecision.classList.remove('node-inactive');
+
+                // Split Rule 2: Petal Width <= 1.75 cm
+                if (pWidth <= 1.75) {
+                    // Navigate left down to Versicolor Leaf
+                    document.getElementById('path-mid-left').classList.add('path-active');
+                    document.getElementById('path-mid-left').classList.remove('path-inactive');
+
+                    const leafVersicolor = document.getElementById('node-leaf-versicolor');
+                    leafVersicolor.classList.add('node-active');
+                    leafVersicolor.classList.remove('node-inactive');
+
+                    finalPredictedSpecies = 'versicolor';
+                } else {
+                    // Navigate right down to Virginica Leaf
+                    document.getElementById('path-mid-right').classList.add('path-active');
+                    document.getElementById('path-mid-right').classList.remove('path-inactive');
+
+                    const leafVirginica = document.getElementById('node-leaf-virginica');
+                    leafVirginica.classList.add('node-active');
+                    leafVirginica.classList.remove('node-inactive');
+
+                    finalPredictedSpecies = 'virginica';
+                }
+            }
+
+            // Render prediction output contents inside the black display box
+            const speciesData = SPECIES_CARE_DB[finalPredictedSpecies];
+            document.getElementById('predicted-species-name').innerText = speciesData.name;
+            document.getElementById('predicted-species-desc').innerText = speciesData.desc;
+        }
+
+        // Action function to copy Python source code easily
+        function copyCode() {
+            const codeText = document.querySelector('pre code').innerText;
+            const textarea = document.createElement("textarea");
+            textarea.value = codeText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                alert("파이썬 예제 코드가 성공적으로 클립보드에 복사되었습니다! 💻");
+            } catch (err) {
+                alert("코드 복사 중 에러가 발생했습니다. 수동으로 드래그하여 복사해 주세요.");
+            }
+            document.body.removeChild(textarea);
+        }
+
+        // Initialize elements and SVG calculations on ready
+        window.onload = function() {
+            updatePrediction();
+            adjustSvgPaths();
+            
+            // Re-render SVG connections dynamically on browser screen size adjustments
+            window.addEventListener('resize', adjustSvgPaths);
+        }
+    </script>
+</body>
+</html>
